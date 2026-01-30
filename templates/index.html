@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 安全助手 - Vibe Coding</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        .chat-container { height: calc(100vh - 240px); }
+        .markdown-body pre { background: #1a1a1a; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; overflow-x: auto; }
+        .user-msg { background: #2d3748; }
+        .ai-msg { background: #1a202c; border: 1px solid #4a5568; }
+        .btn-active { border-color: #60a5fa !important; background-color: #1e3a8a !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+    <div class="max-w-4xl mx-auto p-4">
+        <header class="flex justify-between items-center mb-4 py-4 border-b border-gray-700">
+            <h1 class="text-2xl font-bold text-blue-400">CyberCat AI <span class="text-xs font-normal text-gray-500">Vibe Coding Edition</span></h1>
+            <div id="status-tag" class="text-green-500 text-xs flex items-center">
+                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> 在线模式: <span id="current-mode-display" class="ml-1 font-bold">普通对话</span>
+            </div>
+        </header>
+
+        <div id="chat-box" class="chat-container overflow-y-auto mb-4 space-y-4 pr-2">
+            <div class="ai-msg p-4 rounded-lg">你好！请选择下方模式开始，或者直接提问。</div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button id="btn-chat" onclick="setMode('chat')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center btn-active">
+                <span class="mr-1">💬</span> 普通对话
+            </button>
+            <button id="btn-c" onclick="setMode('c')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                <span class="mr-1">📁</span> C 语言模式
+            </button>
+            <button id="btn-python" onclick="setMode('python')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                <span class="mr-1">🐍</span> Python 模式
+            </button>
+            <!-- 新增 Java 模式按钮 -->
+            <button id="btn-java" onclick="setMode('java')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                <span class="mr-1">☕</span> Java 模式
+            </button>
+            <div class="border-l border-gray-700 mx-1"></div>
+            <button onclick="clearHistory()" class="bg-gray-800 border border-gray-600 hover:bg-red-900/40 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                <span class="mr-1">🧹</span> Clear
+            </button>
+            <button onclick="quitApp()" class="bg-gray-800 border border-gray-600 hover:bg-red-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                <span class="mr-1">❌</span> Quit
+            </button>
+        </div>
+
+        <div class="relative">
+            <input type="text" id="user-input" 
+                class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 pr-24 focus:outline-none focus:border-blue-500"
+                placeholder="按当前模式输入需求..."
+                onkeyup="if(event.key==='Enter') sendMessage()">
+            <button id="send-btn" onclick="sendMessage()" 
+                class="absolute right-2 top-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition">发送</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        let currentMode = 'chat';
+
+        function setMode(mode) {
+            currentMode = mode;
+            updateModeUI();
+            // 在映射中增加了 Java
+            const modeNames = { 'chat': '普通对话', 'c': 'C 语言编程', 'python': 'Python 编程', 'java': 'Java 编程' };
+            document.getElementById('current-mode-display').innerText = modeNames[mode];
+        }
+
+        function updateModeUI() {
+            // 在列表中增加了 btn-java
+            ['btn-chat', 'btn-c', 'btn-python', 'btn-java'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.remove('btn-active');
+            });
+            const activeBtn = document.getElementById(`btn-${currentMode}`);
+            if(activeBtn) activeBtn.classList.add('btn-active');
+        }
+
+        function createMessageElement(role) {
+            const div = document.createElement('div');
+            div.className = `p-4 rounded-lg ${role === 'user' ? 'user-msg ml-12' : 'ai-msg mr-12'}`;
+            div.innerHTML = `<div class="text-xs text-gray-500 mb-1">${role === 'user' ? '你' : '猫娘助手'}</div>
+                             <div class="markdown-body text-gray-200"></div>
+                             <div class="file-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-400 hidden"></div>`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return div;
+        }
+
+        async function sendMessage() {
+            const msg = userInput.value.trim();
+            if (!msg) return;
+
+            const userDiv = createMessageElement('user');
+            userDiv.querySelector('.markdown-body').innerText = msg;
+            
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            const aiDiv = createMessageElement('ai');
+            const aiContentBody = aiDiv.querySelector('.markdown-body');
+            const fileInfoDiv = aiDiv.querySelector('.file-info');
+            let fullText = "";
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, mode: currentMode })
+                });
+
+                if (!response.ok) throw new Error('网络响应错误');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            if (data.content) {
+                                fullText += data.content;
+                                aiContentBody.innerHTML = marked.parse(fullText);
+                                hljs.highlightAll();
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            }
+
+                            if (data.done) {
+                                if (data.files && data.files.length > 0) {
+                                    fileInfoDiv.classList.remove('hidden');
+                                    const fileTags = data.files.map(f => `<span class="bg-green-900 text-green-200 text-xs px-2 py-1 rounded mr-2">${f}</span>`).join('');
+                                    fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
+                                }
+                            }
+
+                            if (data.error) {
+                                aiContentBody.innerHTML += `<div class="text-red-500 mt-2">错误: ${data.error}</div>`;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                aiContentBody.innerHTML = `<div class="text-red-500">连接中断或后端报错</div>`;
+            } finally {
+                sendBtn.disabled = false;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        async function clearHistory() {
+            if(!confirm("清空历史？")) return;
+            await fetch('/clear', { method: 'POST' });
+            chatBox.innerHTML = '<div class="ai-msg p-4 rounded-lg">对话历史已清空。已重置为普通对话。</div>';
+            setMode('chat');
+        }
+
+        async function quitApp() {
+            if(!confirm("退出应用？")) return;
+            document.getElementById('status-tag').innerHTML = '<span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span> 服务已关闭';
+            fetch('/quit', { method: 'POST' });
+            const div = createMessageElement('ai');
+            div.querySelector('.markdown-body').innerText = "后端进程已终止，请手动关闭窗口。";
+        }
+    </script>
+</body>
+</html>
