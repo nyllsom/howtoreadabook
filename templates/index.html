@@ -3,62 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 安全助手 - Vibe Coding</title>
+    <title>CyberCat RAG Demo</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Markdown -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Code highlight -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- ✅ KaTeX (Math) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+    <!-- ✅ 这里去掉 defer：保证 renderMathInElement 尽早可用（避免偶发不渲染） -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
+
     <style>
-        .chat-container { height: calc(100vh - 240px); }
-        .markdown-body pre { background: #1a1a1a; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; overflow-x: auto; }
+        .chat-container { height: calc(100vh - 330px); }
+        .markdown-body pre { background: #1a1a1a; padding: 1rem; border-radius: 0.75rem; margin: 1rem 0; overflow-x: auto; }
         .user-msg { background: #2d3748; }
-        .ai-msg { background: #1a202c; border: 1px solid #4a5568; }
-        .btn-active { border-color: #60a5fa !important; background-color: #1e3a8a !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        .ai-msg { background: #111827; border: 1px solid #374151; }
+        .btn-active { border-color: #60a5fa !important; background-color: #1e3a8a !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.35); }
+        .panel { background: rgba(17,24,39,.7); border: 1px solid #374151; border-radius: 0.75rem; }
+        .tiny { font-size: 12px; }
+
+        /* ✅ KaTeX: 解决超长公式溢出/难看 */
+        .katex { font-size: 1.05em; max-width: 100%; display: inline-block; overflow-x: auto; overflow-y: hidden; }
+        .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; }
+        .markdown-body p { overflow-wrap: anywhere; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans">
-    <div class="max-w-4xl mx-auto p-4">
-        <header class="flex justify-between items-center mb-4 py-4 border-b border-gray-700">
-            <h1 class="text-2xl font-bold text-blue-400">CyberCat AI <span class="text-xs font-normal text-gray-500">Vibe Coding Edition</span></h1>
+    <div class="max-w-6xl mx-auto p-4">
+        <header class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 mb-4 py-4 border-b border-gray-800">
+            <div>
+                <h1 class="text-2xl font-bold text-blue-400">CyberCat AI <span class="text-xs font-normal text-gray-500">RAG + Personalization Demo</span></h1>
+                <div class="tiny text-gray-500 mt-1">上传 PDF/DOCX 作为知识库，开启 RAG 后回答会带引用来源；偏好与记忆可控可编辑。</div>
+            </div>
             <div id="status-tag" class="text-green-500 text-xs flex items-center">
                 <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> 在线模式: <span id="current-mode-display" class="ml-1 font-bold">普通对话</span>
             </div>
         </header>
 
-        <div id="chat-box" class="chat-container overflow-y-auto mb-4 space-y-4 pr-2">
-            <div class="ai-msg p-4 rounded-lg">你好！请选择下方模式开始，或者直接提问。</div>
-        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left: Knowledge base + Personalization -->
+            <div class="space-y-4">
+                <div class="panel p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="font-semibold">📚 知识库</div>
+                        <div class="tiny text-gray-400">向量条目: <span id="vec-count">0</span></div>
+                    </div>
 
-        <div class="flex flex-wrap gap-2 mb-4">
-            <button id="btn-chat" onclick="setMode('chat')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center btn-active">
-                <span class="mr-1">💬</span> 普通对话
-            </button>
-            <button id="btn-c" onclick="setMode('c')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                <span class="mr-1">📁</span> C 语言模式
-            </button>
-            <button id="btn-python" onclick="setMode('python')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                <span class="mr-1">🐍</span> Python 模式
-            </button>
-            <!-- 新增 Java 模式按钮 -->
-            <button id="btn-java" onclick="setMode('java')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                <span class="mr-1">☕</span> Java 模式
-            </button>
-            <div class="border-l border-gray-700 mx-1"></div>
-            <button onclick="clearHistory()" class="bg-gray-800 border border-gray-600 hover:bg-red-900/40 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                <span class="mr-1">🧹</span> Clear
-            </button>
-            <button onclick="quitApp()" class="bg-gray-800 border border-gray-600 hover:bg-red-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                <span class="mr-1">❌</span> Quit
-            </button>
-        </div>
+                    <form id="uploadForm" class="flex gap-2 items-center">
+                        <label for="kbFile" class="tiny text-gray-300 whitespace-nowrap">选择文件</label>
+                        <input
+                            id="kbFile"
+                            type="file"
+                            name="file"
+                            accept=".pdf,.docx"
+                            class="block w-full text-sm text-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600"
+                        />
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-sm transition">
+                            上传
+                        </button>
+                    </form>
+                    <div id="uploadStatus" class="tiny text-gray-400 mt-2"></div>
 
-        <div class="relative">
-            <input type="text" id="user-input" 
-                class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 pr-24 focus:outline-none focus:border-blue-500"
-                placeholder="按当前模式输入需求..."
-                onkeyup="if(event.key==='Enter') sendMessage()">
-            <button id="send-btn" onclick="sendMessage()" 
-                class="absolute right-2 top-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition">发送</button>
+                    <div class="mt-3 flex items-center justify-between">
+                        <label class="flex items-center gap-2 tiny text-gray-200">
+                            <input id="ragToggle" type="checkbox" class="accent-blue-500" checked />
+                            使用知识库（RAG）
+                        </label>
+                        <div class="tiny text-gray-500">
+                            <label for="topk" class="mr-2">topK:</label>
+                            <input
+                                id="topk"
+                                type="number"
+                                min="1"
+                                max="12"
+                                value="6"
+                                class="w-14 bg-gray-800 border border-gray-700 rounded px-2 py-1 tiny"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="tiny text-gray-400 mb-1">已上传文件</div>
+                        <div id="docList" class="space-y-2 max-h-52 overflow-auto pr-1"></div>
+                    </div>
+                </div>
+
+                <div class="panel p-4">
+                    <div class="font-semibold mb-2">🧠 个人化</div>
+
+                    <div class="tiny text-gray-400 mb-1">偏好（会注入系统提示词）</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input id="prefLanguage" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" placeholder="language: zh/en">
+                        <input id="prefTone" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" placeholder="tone: 专业但可爱">
+                    </div>
+                    <textarea id="prefFormat" class="mt-2 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="2" placeholder="format_hint：例如 先结论后分点，最后给 next steps"></textarea>
+                    <textarea id="prefCite" class="mt-2 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="2" placeholder="cite_style：例如 仅在引用存在时输出 [1][2]"></textarea>
+
+                    <div class="tiny text-gray-400 mt-3 mb-1">记忆（手动可控，可随时修改/清空）</div>
+                    <textarea id="memoryBox" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="4" placeholder="例如：我在做一个安全工具项目；偏好用中文；回答要短；给可执行步骤..."></textarea>
+
+                    <div class="flex gap-2 mt-2">
+                        <button id="savePersonalBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm transition">保存</button>
+                        <button id="loadPersonalBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition">刷新</button>
+                    </div>
+                    <div id="personalStatus" class="tiny text-gray-400 mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Right: Chat -->
+            <div class="lg:col-span-2">
+                <div id="chat-box" class="chat-container overflow-y-auto mb-4 space-y-4 pr-2">
+                    <div class="ai-msg p-4 rounded-lg">
+                        你好！上传你的 PDF/DOCX 并开启 RAG，我就可以“带引用”地回答啦～
+                        <div class="tiny text-gray-400 mt-2">提示：这是 demo，没有做用户隔离；本机单人使用没问题。</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <button id="btn-chat" onclick="setMode('chat')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center btn-active">
+                        <span class="mr-1">💬</span> 普通对话
+                    </button>
+                    <button id="btn-c" onclick="setMode('c')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                        <span class="mr-1">📁</span> C 语言模式
+                    </button>
+                    <button id="btn-python" onclick="setMode('python')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                        <span class="mr-1">🐍</span> Python 模式
+                    </button>
+                    <button id="btn-java" onclick="setMode('java')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                        <span class="mr-1">☕</span> Java 模式
+                    </button>
+                    <div class="border-l border-gray-800 mx-1"></div>
+                    <button onclick="clearHistory()" class="bg-gray-800 border border-gray-600 hover:bg-red-900/40 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                        <span class="mr-1">🧹</span> Clear
+                    </button>
+                    <button onclick="quitApp()" class="bg-gray-800 border border-gray-600 hover:bg-red-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
+                        <span class="mr-1">❌</span> Quit
+                    </button>
+                </div>
+
+                <div class="relative">
+                    <input type="text" id="user-input"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 pr-24 focus:outline-none focus:border-blue-500"
+                        placeholder="按当前模式输入需求..."
+                        onkeyup="if(event.key==='Enter') sendMessage()">
+                    <button id="send-btn" onclick="sendMessage()"
+                        class="absolute right-2 top-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition">发送</button>
+                </div>
+                <div class="tiny text-gray-500 mt-2">RAG 开启时：会先检索知识库片段，再交给模型回答，并在最后返回引用来源卡片。</div>
+            </div>
         </div>
     </div>
 
@@ -66,18 +164,31 @@
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const docList = document.getElementById('docList');
+        const vecCount = document.getElementById('vec-count');
+
+        const ragToggle = document.getElementById('ragToggle');
+        const topk = document.getElementById('topk');
+
+        const prefLanguage = document.getElementById('prefLanguage');
+        const prefTone = document.getElementById('prefTone');
+        const prefFormat = document.getElementById('prefFormat');
+        const prefCite = document.getElementById('prefCite');
+        const memoryBox = document.getElementById('memoryBox');
+        const personalStatus = document.getElementById('personalStatus');
+
         let currentMode = 'chat';
 
         function setMode(mode) {
             currentMode = mode;
             updateModeUI();
-            // 在映射中增加了 Java
             const modeNames = { 'chat': '普通对话', 'c': 'C 语言编程', 'python': 'Python 编程', 'java': 'Java 编程' };
             document.getElementById('current-mode-display').innerText = modeNames[mode];
         }
 
         function updateModeUI() {
-            // 在列表中增加了 btn-java
             ['btn-chat', 'btn-c', 'btn-python', 'btn-java'].forEach(id => {
                 const el = document.getElementById(id);
                 if(el) el.classList.remove('btn-active');
@@ -89,13 +200,256 @@
         function createMessageElement(role) {
             const div = document.createElement('div');
             div.className = `p-4 rounded-lg ${role === 'user' ? 'user-msg ml-12' : 'ai-msg mr-12'}`;
-            div.innerHTML = `<div class="text-xs text-gray-500 mb-1">${role === 'user' ? '你' : '猫娘助手'}</div>
-                             <div class="markdown-body text-gray-200"></div>
-                             <div class="file-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-400 hidden"></div>`;
+            div.innerHTML = `
+                <div class="text-xs text-gray-500 mb-1">${role === 'user' ? '你' : '猫娘助手'}</div>
+                <div class="markdown-body text-gray-200"></div>
+                <div class="file-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-400 hidden"></div>
+                <div class="cite-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-300 hidden"></div>
+            `;
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
             return div;
         }
+
+        async function refreshDocs() {
+            const r = await fetch('/docs');
+            const j = await r.json();
+            vecCount.textContent = j.vector_count ?? 0;
+
+            const docs = j.documents || [];
+            if (docs.length === 0) {
+                docList.innerHTML = '<div class="tiny text-gray-500">还没有上传任何文件</div>';
+                return;
+            }
+            docList.innerHTML = docs.map(d => `
+                <div class="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="text-sm text-gray-200 truncate">${escapeHtml(d.filename)}</div>
+                        <div class="tiny text-gray-500">#${d.id} · ${escapeHtml(d.created_at)}</div>
+                    </div>
+                    <button
+                        class="shrink-0 bg-red-700/70 hover:bg-red-600 text-white tiny px-2 py-1 rounded"
+                        onclick="deleteDoc(${d.id}, '${escapeHtml(d.filename)}')"
+                        title="删除这个文件（会重建索引）"
+                    >🗑 删除</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteDoc(id, filename) {
+            if (!confirm(`确认删除：${filename} ？\n（删除后会重建向量索引，demo 中这是正常操作）`)) return;
+
+            uploadStatus.textContent = `正在删除 #${id}...`;
+            try {
+                const r = await fetch(`/docs/${id}`, { method: 'DELETE' });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || '删除失败');
+
+                uploadStatus.textContent = `删除成功：#${id}（向量条目：${j.vector_count ?? '更新中'}）`;
+                await refreshDocs();
+            } catch (err) {
+                uploadStatus.textContent = `删除失败：${err.message}`;
+            }
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+            }[m]));
+        }
+
+        // -----------------------------
+        // ✅ LaTeX 预处理：跳过代码块 + 修复不成对的单 $
+        // -----------------------------
+        function splitByFencedCode(text) {
+            const parts = [];
+            const re = /```[\s\S]*?```/g;
+            let last = 0, m;
+            while ((m = re.exec(text)) !== null) {
+                if (m.index > last) parts.push({ type: 'text', value: text.slice(last, m.index) });
+                parts.push({ type: 'code', value: m[0] });
+                last = m.index + m[0].length;
+            }
+            if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
+            return parts;
+        }
+
+        function normalizeLatexDelimitersOutsideCode(text) {
+            if (!text) return '';
+            return splitByFencedCode(text).map(p => {
+                if (p.type === 'code') return p.value;
+
+                let t = p.value;
+
+                // \[ \] -> $$ $$
+                t = t.replace(/\\\[\s*/g, '\n$$\n');
+                t = t.replace(/\s*\\\]/g, '\n$$\n');
+
+                // \( \) -> $ $
+                t = t.replace(/\\\(\s*/g, '$');
+                t = t.replace(/\s*\\\)/g, '$');
+
+                return t;
+            }).join('');
+        }
+
+        // ✅ 关键修复：如果出现奇数个单 $（排除 $$），就把最后一个单 $ 变成 \$，避免 KaTeX 整段失效
+        function fixUnbalancedInlineDollars(text) {
+            if (!text) return '';
+
+            return splitByFencedCode(text).map(p => {
+                if (p.type === 'code') return p.value;
+
+                let t = p.value;
+
+                // 暂存 $$，避免干扰单 $ 计数
+                const DDL = "__DDL__";
+                t = t.replace(/\$\$/g, DDL);
+
+                // 找“单 $”：不支持转义 \$
+                const positions = [];
+                for (let i = 0; i < t.length; i++) {
+                    if (t[i] === '$' && t[i - 1] !== '\\') positions.push(i);
+                }
+
+                if (positions.length % 2 === 1) {
+                    const last = positions[positions.length - 1];
+                    t = t.slice(0, last) + '\\$' + t.slice(last + 1);
+                }
+
+                // 还原 $$
+                t = t.replace(new RegExp(DDL, 'g'), '$$');
+                return t;
+            }).join('');
+        }
+
+        // -----------------------------
+        // ✅ KaTeX 渲染：done 时渲染；如果库没准备好，稍后重试
+        // -----------------------------
+        function renderMathSafe(rootEl, retries = 6) {
+            if (!rootEl) return;
+            if (!window.renderMathInElement) {
+                if (retries <= 0) return;
+                setTimeout(() => renderMathSafe(rootEl, retries - 1), 80);
+                return;
+            }
+            try {
+                window.renderMathInElement(rootEl, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                    ],
+                    throwOnError: false,
+                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+                });
+            } catch (e) {
+                // 极端情况下再重试一次
+                if (retries > 0) setTimeout(() => renderMathSafe(rootEl, retries - 1), 80);
+            }
+        }
+
+        function highlightCode(rootEl) {
+            if (!rootEl) return;
+            rootEl.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+
+        function renderMarkdownInto(el, rawText, { finalizeMath = false } = {}) {
+            let normalized = normalizeLatexDelimitersOutsideCode(rawText);
+            normalized = fixUnbalancedInlineDollars(normalized);
+
+            el.innerHTML = marked.parse(normalized);
+            highlightCode(el);
+
+            if (finalizeMath) {
+                renderMathSafe(el);
+            }
+        }
+
+        // -----------------------------
+        // ✅ SSE 解析：按 \n\n 分隔 event，防止丢 done 包
+        // -----------------------------
+        function parseSSEEvents(buffer) {
+            const events = [];
+            let idx;
+            while ((idx = buffer.indexOf('\n\n')) !== -1) {
+                const rawEvent = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + 2);
+
+                const dataLines = rawEvent.split('\n').filter(l => l.startsWith('data:'));
+                if (dataLines.length) {
+                    const dataStr = dataLines.map(l => l.replace(/^data:\s?/, '')).join('\n');
+                    events.push(dataStr);
+                }
+            }
+            return { events, buffer };
+        }
+
+        // 流式渲染节流
+        let renderScheduled = false;
+        function scheduleStreamRender(el, getText) {
+            if (renderScheduled) return;
+            renderScheduled = true;
+            setTimeout(() => {
+                renderScheduled = false;
+                renderMarkdownInto(el, getText(), { finalizeMath: false });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 60);
+        }
+
+        uploadForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(uploadForm);
+            uploadStatus.textContent = '上传 & 解析 & 建库中...';
+            try {
+                const r = await fetch('/upload', { method: 'POST', body: fd });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || '上传失败');
+                uploadStatus.textContent = `完成：${j.filename} · chunks=${j.chunks}`;
+                await refreshDocs();
+            } catch (err) {
+                uploadStatus.textContent = `失败：${err.message}`;
+            }
+        };
+
+        async function loadPersonal() {
+            const [p1, p2] = await Promise.all([
+                fetch('/prefs').then(r => r.json()),
+                fetch('/profile').then(r => r.json())
+            ]);
+            prefLanguage.value = p1.language || 'zh';
+            prefTone.value = p1.tone || '';
+            prefFormat.value = p1.format_hint || '';
+            prefCite.value = p1.cite_style || '';
+            memoryBox.value = p2.memory || '';
+            personalStatus.textContent = '已刷新';
+            setTimeout(() => personalStatus.textContent = '', 1200);
+        }
+
+        async function savePersonal() {
+            personalStatus.textContent = '保存中...';
+            await fetch('/prefs', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    language: prefLanguage.value.trim(),
+                    tone: prefTone.value.trim(),
+                    format_hint: prefFormat.value.trim(),
+                    cite_style: prefCite.value.trim()
+                })
+            });
+            await fetch('/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ memory: memoryBox.value })
+            });
+            personalStatus.textContent = '已保存 ✅';
+            setTimeout(() => personalStatus.textContent = '', 1500);
+        }
+
+        document.getElementById('savePersonalBtn').onclick = (e) => { e.preventDefault(); savePersonal(); };
+        document.getElementById('loadPersonalBtn').onclick = (e) => { e.preventDefault(); loadPersonal(); };
 
         async function sendMessage() {
             const msg = userInput.value.trim();
@@ -103,20 +457,32 @@
 
             const userDiv = createMessageElement('user');
             userDiv.querySelector('.markdown-body').innerText = msg;
-            
+
             userInput.value = '';
             sendBtn.disabled = true;
 
             const aiDiv = createMessageElement('ai');
             const aiContentBody = aiDiv.querySelector('.markdown-body');
             const fileInfoDiv = aiDiv.querySelector('.file-info');
+            const citeInfoDiv = aiDiv.querySelector('.cite-info');
+
             let fullText = "";
+            let sseBuffer = "";
+
+            fileInfoDiv.classList.add('hidden');
+            citeInfoDiv.classList.add('hidden');
+            citeInfoDiv.innerHTML = '';
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: msg, mode: currentMode })
+                    body: JSON.stringify({
+                        message: msg,
+                        mode: currentMode,
+                        use_rag: ragToggle.checked,
+                        top_k: parseInt(topk.value || '6', 10)
+                    })
                 });
 
                 if (!response.ok) throw new Error('网络响应错误');
@@ -128,30 +494,71 @@
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.slice(6));
-                            
-                            if (data.content) {
-                                fullText += data.content;
-                                aiContentBody.innerHTML = marked.parse(fullText);
-                                hljs.highlightAll();
-                                chatBox.scrollTop = chatBox.scrollHeight;
+                    sseBuffer += decoder.decode(value, { stream: true });
+                    const parsed = parseSSEEvents(sseBuffer);
+                    sseBuffer = parsed.buffer;
+
+                    for (const evt of parsed.events) {
+                        let data;
+                        try {
+                            data = JSON.parse(evt);
+                        } catch (e) {
+                            continue;
+                        }
+
+                        if (data.content) {
+                            fullText += data.content;
+                            scheduleStreamRender(aiContentBody, () => fullText);
+                        }
+
+                        if (data.error) {
+                            fullText += `\n\n**错误：** ${data.error}`;
+                            renderMarkdownInto(aiContentBody, fullText, { finalizeMath: false });
+                        }
+
+                        if (data.done) {
+                            // ✅ done：最终渲染（含数学）
+                            renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
+
+                            if (data.files && data.files.length > 0) {
+                                fileInfoDiv.classList.remove('hidden');
+                                const fileTags = data.files.map(f =>
+                                    `<span class="bg-emerald-900 text-emerald-200 text-xs px-2 py-1 rounded mr-2">${escapeHtml(f)}</span>`
+                                ).join('');
+                                fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
                             }
 
-                            if (data.done) {
-                                if (data.files && data.files.length > 0) {
-                                    fileInfoDiv.classList.remove('hidden');
-                                    const fileTags = data.files.map(f => `<span class="bg-green-900 text-green-200 text-xs px-2 py-1 rounded mr-2">${f}</span>`).join('');
-                                    fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
-                                }
+                            const citations = Array.isArray(data.citations) ? data.citations : [];
+                            const retrieved = Array.isArray(data.retrieved) ? data.retrieved : [];
+
+                            if (citations.length > 0) {
+                                citeInfoDiv.classList.remove('hidden');
+                                citeInfoDiv.innerHTML =
+                                    '<div class="font-semibold mb-2">引用来源</div>' +
+                                    citations.map(c => `
+                                        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 mb-2">
+                                            <div class="tiny text-blue-300 font-semibold">
+                                                ${escapeHtml(c.tag)} ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))}${c.score != null ? ` · score=${escapeHtml(String(c.score))}` : ''}
+                                            </div>
+                                            <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                        </div>
+                                    `).join('');
+                            } else if (retrieved.length > 0) {
+                                citeInfoDiv.classList.remove('hidden');
+                                citeInfoDiv.innerHTML =
+                                    '<div class="font-semibold mb-2">检索到候选片段（未达到引用阈值）</div>' +
+                                    `<div class="tiny text-gray-400 mb-2">说明：本次检索到的片段可能与问题不够贴合，所以没有作为“引用”插入回答，但你仍可参考。</div>` +
+                                    retrieved.map((c, idx) => `
+                                        <div class="bg-gray-800/40 border border-gray-700 rounded-lg p-3 mb-2">
+                                            <div class="tiny text-gray-300 font-semibold">
+                                                [cand${idx+1}] ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))} · score=${escapeHtml(String(c.score))}
+                                            </div>
+                                            <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                        </div>
+                                    `).join('');
                             }
 
-                            if (data.error) {
-                                aiContentBody.innerHTML += `<div class="text-red-500 mt-2">错误: ${data.error}</div>`;
-                            }
+                            chatBox.scrollTop = chatBox.scrollHeight;
                         }
                     }
                 }
@@ -178,6 +585,12 @@
             const div = createMessageElement('ai');
             div.querySelector('.markdown-body').innerText = "后端进程已终止，请手动关闭窗口。";
         }
+
+        (async () => {
+            setMode('chat');
+            await refreshDocs();
+            await loadPersonal();
+        })();
     </script>
 </body>
 </html>
