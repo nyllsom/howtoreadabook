@@ -15,7 +15,7 @@
 
     <!-- ✅ KaTeX (Math) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
-    <!-- ✅ 这里去掉 defer：保证 renderMathInElement 尽早可用（避免偶发不渲染） -->
+    <!-- 保持不 defer：让 KaTeX 尽早可用 -->
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
 
@@ -324,28 +324,31 @@
         }
 
         // -----------------------------
-        // ✅ KaTeX 渲染：done 时渲染；如果库没准备好，稍后重试
+        // ✅ KaTeX 渲染：更稳的等待 + 更长重试 + 下一帧执行
         // -----------------------------
-        function renderMathSafe(rootEl, retries = 6) {
+        function renderMathSafe(rootEl, retries = 40, delayMs = 120) {
             if (!rootEl) return;
-            if (!window.renderMathInElement) {
-                if (retries <= 0) return;
-                setTimeout(() => renderMathSafe(rootEl, retries - 1), 80);
-                return;
-            }
-            try {
-                window.renderMathInElement(rootEl, {
-                    delimiters: [
-                        { left: "$$", right: "$$", display: true },
-                        { left: "$", right: "$", display: false },
-                    ],
-                    throwOnError: false,
-                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
-                });
-            } catch (e) {
-                // 极端情况下再重试一次
-                if (retries > 0) setTimeout(() => renderMathSafe(rootEl, retries - 1), 80);
-            }
+
+            // 放到下一帧：确保 marked 渲染后的 DOM 已经落地
+            requestAnimationFrame(() => {
+                if (!window.renderMathInElement) {
+                    if (retries <= 0) return;
+                    setTimeout(() => renderMathSafe(rootEl, retries - 1, delayMs), delayMs);
+                    return;
+                }
+                try {
+                    window.renderMathInElement(rootEl, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false },
+                        ],
+                        throwOnError: false,
+                        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+                    });
+                } catch (e) {
+                    if (retries > 0) setTimeout(() => renderMathSafe(rootEl, retries - 1, delayMs), delayMs);
+                }
+            });
         }
 
         function highlightCode(rootEl) {
@@ -368,25 +371,46 @@
         }
 
         // -----------------------------
-        // ✅ SSE 解析：按 \n\n 分隔 event，防止丢 done 包
+        // ✅ SSE 解析：支持 \n\n 与 \r\n\r\n；并提供 flush 机制
         // -----------------------------
         function parseSSEEvents(buffer) {
             const events = [];
-            let idx;
-            while ((idx = buffer.indexOf('\n\n')) !== -1) {
-                const rawEvent = buffer.slice(0, idx);
-                buffer = buffer.slice(idx + 2);
 
-                const dataLines = rawEvent.split('\n').filter(l => l.startsWith('data:'));
+            // 兼容 \n\n 和 \r\n\r\n
+            const sepRe = /\r?\n\r?\n/;
+
+            while (true) {
+                const match = sepRe.exec(buffer);
+                if (!match) break;
+
+                const idx = match.index;
+                const rawEvent = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + match[0].length);
+
+                const lines = rawEvent.split(/\r?\n/);
+                const dataLines = lines.filter(l => l.startsWith('data:'));
                 if (dataLines.length) {
                     const dataStr = dataLines.map(l => l.replace(/^data:\s?/, '')).join('\n');
                     events.push(dataStr);
                 }
             }
+
             return { events, buffer };
         }
 
-        // 流式渲染节流
+        // ✅ flush：流结束时把残留 buffer 当成一个 event 再解析一次（防止 done 丢失）
+        function flushSSEBuffer(buffer) {
+            const trimmed = (buffer || '').trim();
+            if (!trimmed) return [];
+
+            const lines = trimmed.split(/\r?\n/);
+            const dataLines = lines.filter(l => l.startsWith('data:'));
+            if (!dataLines.length) return [];
+
+            return [dataLines.map(l => l.replace(/^data:\s?/, '')).join('\n')];
+        }
+
+        // 流式渲染节流（全局 single-flight；send 按钮禁用所以够用）
         let renderScheduled = false;
         function scheduleStreamRender(el, getText) {
             if (renderScheduled) return;
@@ -468,6 +492,7 @@
 
             let fullText = "";
             let sseBuffer = "";
+            let gotDone = false; // ✅ 记录是否真的收到 done
 
             fileInfoDiv.classList.add('hidden');
             citeInfoDiv.classList.add('hidden');
@@ -490,6 +515,72 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
+                const handleEvent = (evtStr) => {
+                    let data;
+                    try {
+                        data = JSON.parse(evtStr);
+                    } catch (e) {
+                        return;
+                    }
+
+                    if (data.content) {
+                        fullText += data.content;
+                        scheduleStreamRender(aiContentBody, () => fullText);
+                    }
+
+                    if (data.error) {
+                        fullText += `\n\n**错误：** ${data.error}`;
+                        renderMarkdownInto(aiContentBody, fullText, { finalizeMath: false });
+                    }
+
+                    if (data.done) {
+                        gotDone = true;
+
+                        // ✅ done：最终渲染（含数学）
+                        renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
+
+                        if (data.files && data.files.length > 0) {
+                            fileInfoDiv.classList.remove('hidden');
+                            const fileTags = data.files.map(f =>
+                                `<span class="bg-emerald-900 text-emerald-200 text-xs px-2 py-1 rounded mr-2">${escapeHtml(f)}</span>`
+                            ).join('');
+                            fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
+                        }
+
+                        const citations = Array.isArray(data.citations) ? data.citations : [];
+                        const retrieved = Array.isArray(data.retrieved) ? data.retrieved : [];
+
+                        if (citations.length > 0) {
+                            citeInfoDiv.classList.remove('hidden');
+                            citeInfoDiv.innerHTML =
+                                '<div class="font-semibold mb-2">引用来源</div>' +
+                                citations.map(c => `
+                                    <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 mb-2">
+                                        <div class="tiny text-blue-300 font-semibold">
+                                            ${escapeHtml(c.tag)} ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))}${c.score != null ? ` · score=${escapeHtml(String(c.score))}` : ''}
+                                        </div>
+                                        <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                    </div>
+                                `).join('');
+                        } else if (retrieved.length > 0) {
+                            citeInfoDiv.classList.remove('hidden');
+                            citeInfoDiv.innerHTML =
+                                '<div class="font-semibold mb-2">检索到候选片段（未达到引用阈值）</div>' +
+                                `<div class="tiny text-gray-400 mb-2">说明：本次检索到的片段可能与问题不够贴合，所以没有作为“引用”插入回答，但你仍可参考。</div>` +
+                                retrieved.map((c, idx) => `
+                                    <div class="bg-gray-800/40 border border-gray-700 rounded-lg p-3 mb-2">
+                                        <div class="tiny text-gray-300 font-semibold">
+                                            [cand${idx+1}] ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))} · score=${escapeHtml(String(c.score))}
+                                        </div>
+                                        <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                    </div>
+                                `).join('');
+                        }
+
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                };
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -499,69 +590,19 @@
                     sseBuffer = parsed.buffer;
 
                     for (const evt of parsed.events) {
-                        let data;
-                        try {
-                            data = JSON.parse(evt);
-                        } catch (e) {
-                            continue;
-                        }
-
-                        if (data.content) {
-                            fullText += data.content;
-                            scheduleStreamRender(aiContentBody, () => fullText);
-                        }
-
-                        if (data.error) {
-                            fullText += `\n\n**错误：** ${data.error}`;
-                            renderMarkdownInto(aiContentBody, fullText, { finalizeMath: false });
-                        }
-
-                        if (data.done) {
-                            // ✅ done：最终渲染（含数学）
-                            renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
-
-                            if (data.files && data.files.length > 0) {
-                                fileInfoDiv.classList.remove('hidden');
-                                const fileTags = data.files.map(f =>
-                                    `<span class="bg-emerald-900 text-emerald-200 text-xs px-2 py-1 rounded mr-2">${escapeHtml(f)}</span>`
-                                ).join('');
-                                fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
-                            }
-
-                            const citations = Array.isArray(data.citations) ? data.citations : [];
-                            const retrieved = Array.isArray(data.retrieved) ? data.retrieved : [];
-
-                            if (citations.length > 0) {
-                                citeInfoDiv.classList.remove('hidden');
-                                citeInfoDiv.innerHTML =
-                                    '<div class="font-semibold mb-2">引用来源</div>' +
-                                    citations.map(c => `
-                                        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 mb-2">
-                                            <div class="tiny text-blue-300 font-semibold">
-                                                ${escapeHtml(c.tag)} ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))}${c.score != null ? ` · score=${escapeHtml(String(c.score))}` : ''}
-                                            </div>
-                                            <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
-                                        </div>
-                                    `).join('');
-                            } else if (retrieved.length > 0) {
-                                citeInfoDiv.classList.remove('hidden');
-                                citeInfoDiv.innerHTML =
-                                    '<div class="font-semibold mb-2">检索到候选片段（未达到引用阈值）</div>' +
-                                    `<div class="tiny text-gray-400 mb-2">说明：本次检索到的片段可能与问题不够贴合，所以没有作为“引用”插入回答，但你仍可参考。</div>` +
-                                    retrieved.map((c, idx) => `
-                                        <div class="bg-gray-800/40 border border-gray-700 rounded-lg p-3 mb-2">
-                                            <div class="tiny text-gray-300 font-semibold">
-                                                [cand${idx+1}] ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))} · score=${escapeHtml(String(c.score))}
-                                            </div>
-                                            <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
-                                        </div>
-                                    `).join('');
-                            }
-
-                            chatBox.scrollTop = chatBox.scrollHeight;
-                        }
+                        handleEvent(evt);
                     }
                 }
+
+                // ✅ 关键修复：流结束后 flush 一次残留 buffer（防止最后的 done 没有 \n\n）
+                const tailEvents = flushSSEBuffer(sseBuffer);
+                for (const evt of tailEvents) handleEvent(evt);
+
+                // ✅ 兜底：如果后端没发 done，至少也做一次 finalize（保证 KaTeX 不会“偶发永远不渲染”）
+                if (!gotDone) {
+                    renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
+                }
+
             } catch (e) {
                 console.error(e);
                 aiContentBody.innerHTML = `<div class="text-red-500">连接中断或后端报错</div>`;

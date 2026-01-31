@@ -1,0 +1,10 @@
+# ignore environment variables
+.env
+
+# ignore data directory
+data/
+data/**
+
+# ignore code directory
+codes/
+codes/**
