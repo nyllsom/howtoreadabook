@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberCat RAG Demo</title>
+    <title>Mercurial RAG Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Markdown -->
@@ -13,151 +13,477 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-    <!-- ✅ KaTeX (Math) -->
+    <!-- KaTeX (Math) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
-    <!-- 保持不 defer：让 KaTeX 尽早可用 -->
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
 
     <style>
-        .chat-container { height: calc(100vh - 330px); }
-        .markdown-body pre { background: #1a1a1a; padding: 1rem; border-radius: 0.75rem; margin: 1rem 0; overflow-x: auto; }
-        .user-msg { background: #2d3748; }
-        .ai-msg { background: #111827; border: 1px solid #374151; }
-        .btn-active { border-color: #60a5fa !important; background-color: #1e3a8a !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.35); }
-        .panel { background: rgba(17,24,39,.7); border: 1px solid #374151; border-radius: 0.75rem; }
+        :root {
+            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(148, 163, 184, 0.15);
+            --glow-blue: rgba(56, 189, 248, 0.4);
+            --glow-purple: rgba(168, 85, 247, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: #0a0f1a;
+        }
+
+        /* === THREE-LAYER BACKGROUND === */
+        .bg-layers {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        /* Layer 1: Deep gradient */
+        .bg-gradient-base {
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 60% at 20% 30%, rgba(30, 58, 138, 0.5) 0%, transparent 60%),
+                radial-gradient(ellipse 70% 50% at 80% 70%, rgba(88, 28, 135, 0.4) 0%, transparent 50%),
+                linear-gradient(160deg, #0a0f1a 0%, #1e1b4b 40%, #0f172a 70%, #020617 100%);
+        }
+
+        /* Layer 2: Liquid metal/silk shapes */
+        .liquid-shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            will-change: transform, opacity;
+        }
+
+        .liquid-1 {
+            width: 600px;
+            height: 400px;
+            top: -10%;
+            left: 30%;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.3) 0%, rgba(168, 85, 247, 0.2) 50%, rgba(217, 119, 6, 0.15) 100%);
+            animation: drift1 25s ease-in-out infinite;
+        }
+
+        .liquid-2 {
+            width: 500px;
+            height: 350px;
+            bottom: 10%;
+            right: -5%;
+            background: linear-gradient(225deg, rgba(139, 92, 246, 0.35) 0%, rgba(59, 130, 246, 0.2) 60%, rgba(6, 182, 212, 0.15) 100%);
+            animation: drift2 30s ease-in-out infinite;
+        }
+
+        .liquid-3 {
+            width: 400px;
+            height: 300px;
+            top: 50%;
+            left: -5%;
+            background: linear-gradient(45deg, rgba(217, 119, 6, 0.2) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(56, 189, 248, 0.15) 100%);
+            animation: drift3 20s ease-in-out infinite;
+        }
+
+        @keyframes drift1 {
+            0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.5; }
+            25% { transform: translate(50px, 30px) scale(1.1) rotate(5deg); opacity: 0.6; }
+            50% { transform: translate(-30px, 60px) scale(0.95) rotate(-3deg); opacity: 0.45; }
+            75% { transform: translate(20px, -20px) scale(1.05) rotate(2deg); opacity: 0.55; }
+        }
+
+        @keyframes drift2 {
+            0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.45; }
+            33% { transform: translate(-40px, -50px) scale(1.08) rotate(-4deg); opacity: 0.55; }
+            66% { transform: translate(30px, 20px) scale(0.92) rotate(3deg); opacity: 0.4; }
+        }
+
+        @keyframes drift3 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+            50% { transform: translate(60px, -40px) scale(1.15); opacity: 0.5; }
+        }
+
+        /* Layer 3: Noise texture */
+        .noise-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            pointer-events: none;
+        }
+
+        /* === GLASS MORPHISM === */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .glass-panel-sm {
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 
+                0 4px 16px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .glass-header {
+            background: rgba(10, 15, 26, 0.7);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        /* === NEON GLOW EFFECTS === */
+        .glow-btn {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .glow-btn:hover {
+            box-shadow: 0 0 20px var(--glow-blue), 0 0 40px rgba(56, 189, 248, 0.15);
+        }
+
+        .glow-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3), 0 0 20px var(--glow-blue);
+        }
+
+        .btn-active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
+            border-color: rgba(56, 189, 248, 0.5) !important;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .input-glow:focus {
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1), 0 0 20px rgba(56, 189, 248, 0.1);
+        }
+
+        /* === CHAT STYLES === */
+        .chat-container {
+            height: calc(100vh - 340px);
+            min-height: 300px;
+        }
+
+        .user-msg {
+            background: linear-gradient(135deg, rgba(51, 65, 85, 0.6) 0%, rgba(30, 41, 59, 0.5) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .ai-msg {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 27, 75, 0.4) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+        }
+
+        .markdown-body pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 1rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .markdown-body p { overflow-wrap: anywhere; }
+
+        /* === TYPOGRAPHY === */
         .tiny { font-size: 12px; }
 
-        /* ✅ KaTeX: 解决超长公式溢出/难看 */
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8 0%, #a78bfa 50%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* === KATEX === */
         .katex { font-size: 1.05em; max-width: 100%; display: inline-block; overflow-x: auto; overflow-y: hidden; }
         .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; }
-        .markdown-body p { overflow-wrap: anywhere; }
+
+        /* === SCROLLBAR === */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        /* === FORM ELEMENTS === */
+        .form-input {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: rgba(148, 163, 184, 0.5);
+        }
+
+        /* === STATUS DOT === */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 4px currentColor; }
+            50% { box-shadow: 0 0 12px currentColor, 0 0 20px currentColor; }
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans">
-    <div class="max-w-6xl mx-auto p-4">
-        <header class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 mb-4 py-4 border-b border-gray-800">
-            <div>
-                <h1 class="text-2xl font-bold text-blue-400">CyberCat AI <span class="text-xs font-normal text-gray-500">RAG + Personalization Demo</span></h1>
-                <div class="tiny text-gray-500 mt-1">上传 PDF/DOCX 作为知识库，开启 RAG 后回答会带引用来源；偏好与记忆可控可编辑。</div>
-            </div>
-            <div id="status-tag" class="text-green-500 text-xs flex items-center">
-                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> 在线模式: <span id="current-mode-display" class="ml-1 font-bold">普通对话</span>
+<body class="text-slate-100 font-sans antialiased">
+    <!-- Three-layer animated background -->
+    <div class="bg-layers">
+        <div class="bg-gradient-base"></div>
+        <div class="liquid-shape liquid-1"></div>
+        <div class="liquid-shape liquid-2"></div>
+        <div class="liquid-shape liquid-3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- Main content wrapper -->
+    <div class="relative z-10 min-h-screen flex flex-col">
+        <!-- Floating Glass Header -->
+        <header class="glass-header sticky top-0 z-50 px-6 py-4">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-semibold">
+                            <span class="gradient-text">Mercurial</span>
+                            <span class="text-slate-400 text-sm font-normal ml-2">RAG Console</span>
+                        </h1>
+                        <p class="tiny text-slate-500 mt-0.5">智能知识检索 · 个性化响应 · 精准引用</p>
+                    </div>
+                </div>
+                <div id="status-tag" class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700/50">
+                    <span class="status-dot bg-emerald-400 text-emerald-400"></span>
+                    <span class="text-emerald-400 text-xs font-medium">在线</span>
+                    <span class="text-slate-500 text-xs">|</span>
+                    <span class="text-slate-300 text-xs">模式: <span id="current-mode-display" class="font-semibold text-sky-400">普通对话</span></span>
+                </div>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <!-- Left: Knowledge base + Personalization -->
-            <div class="space-y-4">
-                <div class="panel p-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="font-semibold">📚 知识库</div>
-                        <div class="tiny text-gray-400">向量条目: <span id="vec-count">0</span></div>
-                    </div>
+        <!-- Main Content -->
+        <main class="flex-1 px-4 md:px-6 py-6">
+            <div class="max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    
+                    <!-- Left Sidebar: Knowledge Base + Personalization -->
+                    <aside class="lg:col-span-4 xl:col-span-3 space-y-5">
+                        <!-- Knowledge Base Panel -->
+                        <div class="glass-panel p-5">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500/20 to-violet-500/20 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                        </svg>
+                                    </div>
+                                    <span class="font-semibold text-slate-200">知识库</span>
+                                </div>
+                                <div class="px-2 py-1 rounded-md bg-slate-800/60 border border-slate-700/50">
+                                    <span class="tiny text-slate-400">向量: </span>
+                                    <span id="vec-count" class="tiny text-sky-400 font-semibold">0</span>
+                                </div>
+                            </div>
 
-                    <form id="uploadForm" class="flex gap-2 items-center">
-                        <label for="kbFile" class="tiny text-gray-300 whitespace-nowrap">选择文件</label>
-                        <input
-                            id="kbFile"
-                            type="file"
-                            name="file"
-                            accept=".pdf,.docx"
-                            class="block w-full text-sm text-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600"
-                        />
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-sm transition">
-                            上传
-                        </button>
-                    </form>
-                    <div id="uploadStatus" class="tiny text-gray-400 mt-2"></div>
+                            <form id="uploadForm" class="space-y-3">
+                                <div class="flex gap-2">
+                                    <input
+                                        id="kbFile"
+                                        type="file"
+                                        name="file"
+                                        accept=".pdf,.docx"
+                                        class="flex-1 text-sm text-slate-300 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-700/80 file:text-slate-200 hover:file:bg-slate-600 file:cursor-pointer file:transition-colors"
+                                    />
+                                    <button type="submit" class="glow-btn bg-gradient-to-r from-sky-500 to-violet-500 hover:from-sky-400 hover:to-violet-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                        上传
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="uploadStatus" class="tiny text-slate-400 mt-2 min-h-[18px]"></div>
 
-                    <div class="mt-3 flex items-center justify-between">
-                        <label class="flex items-center gap-2 tiny text-gray-200">
-                            <input id="ragToggle" type="checkbox" class="accent-blue-500" checked />
-                            使用知识库（RAG）
-                        </label>
-                        <div class="tiny text-gray-500">
-                            <label for="topk" class="mr-2">topK:</label>
-                            <input
-                                id="topk"
-                                type="number"
-                                min="1"
-                                max="12"
-                                value="6"
-                                class="w-14 bg-gray-800 border border-gray-700 rounded px-2 py-1 tiny"
-                            >
+                            <div class="mt-4 pt-4 border-t border-slate-700/50">
+                                <div class="flex items-center justify-between">
+                                    <label class="flex items-center gap-2 cursor-pointer group">
+                                        <input id="ragToggle" type="checkbox" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-sky-500 focus:ring-sky-500/30 focus:ring-offset-0" checked />
+                                        <span class="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">启用 RAG 检索</span>
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <label for="topk" class="tiny text-slate-500">TopK:</label>
+                                        <input
+                                            id="topk"
+                                            type="number"
+                                            min="1"
+                                            max="12"
+                                            value="6"
+                                            class="form-input w-14 px-2 py-1 tiny text-center text-slate-200"
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <div class="tiny text-slate-500 mb-2">已上传文件</div>
+                                <div id="docList" class="space-y-2 max-h-40 overflow-auto pr-1">
+                                    <div class="tiny text-slate-600">暂无文件</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="mt-3">
-                        <div class="tiny text-gray-400 mb-1">已上传文件</div>
-                        <div id="docList" class="space-y-2 max-h-52 overflow-auto pr-1"></div>
-                    </div>
-                </div>
+                        <!-- Personalization Panel -->
+                        <div class="glass-panel p-5">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-pink-500/20 flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                    </svg>
+                                </div>
+                                <span class="font-semibold text-slate-200">个性化设置</span>
+                            </div>
 
-                <div class="panel p-4">
-                    <div class="font-semibold mb-2">🧠 个人化</div>
+                            <div class="space-y-3">
+                                <div class="tiny text-slate-500 mb-1">响应偏好</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input id="prefLanguage" class="form-input px-3 py-2 tiny text-slate-200" placeholder="语言: zh / en">
+                                    <input id="prefTone" class="form-input px-3 py-2 tiny text-slate-200" placeholder="风格: 专业 / 简洁">
+                                </div>
+                                <textarea id="prefFormat" class="form-input w-full px-3 py-2 tiny text-slate-200 resize-none" rows="2" placeholder="格式提示: 先结论后分点，最后给 next steps"></textarea>
+                                <textarea id="prefCite" class="form-input w-full px-3 py-2 tiny text-slate-200 resize-none" rows="2" placeholder="引用风格: 仅在引用存在时输出 [1][2]"></textarea>
 
-                    <div class="tiny text-gray-400 mb-1">偏好（会注入系统提示词）</div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input id="prefLanguage" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" placeholder="language: zh/en">
-                        <input id="prefTone" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" placeholder="tone: 专业但可爱">
-                    </div>
-                    <textarea id="prefFormat" class="mt-2 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="2" placeholder="format_hint：例如 先结论后分点，最后给 next steps"></textarea>
-                    <textarea id="prefCite" class="mt-2 w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="2" placeholder="cite_style：例如 仅在引用存在时输出 [1][2]"></textarea>
+                                <div class="pt-3 border-t border-slate-700/50">
+                                    <div class="tiny text-slate-500 mb-2">持久记忆</div>
+                                    <textarea id="memoryBox" class="form-input w-full px-3 py-2 tiny text-slate-200 resize-none" rows="3" placeholder="例如：我在做一个安全工具项目；偏好用中文；回答要短..."></textarea>
+                                </div>
 
-                    <div class="tiny text-gray-400 mt-3 mb-1">记忆（手动可控，可随时修改/清空）</div>
-                    <textarea id="memoryBox" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 tiny" rows="4" placeholder="例如：我在做一个安全工具项目；偏好用中文；回答要短；给可执行步骤..."></textarea>
+                                <div class="flex gap-2 pt-2">
+                                    <button id="savePersonalBtn" class="glow-btn flex-1 bg-emerald-600/80 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all">
+                                        保存设置
+                                    </button>
+                                    <button id="loadPersonalBtn" class="flex-1 bg-slate-700/60 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition-all border border-slate-600/50">
+                                        刷新
+                                    </button>
+                                </div>
+                                <div id="personalStatus" class="tiny text-slate-400 mt-1 min-h-[18px] text-center"></div>
+                            </div>
+                        </div>
+                    </aside>
 
-                    <div class="flex gap-2 mt-2">
-                        <button id="savePersonalBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm transition">保存</button>
-                        <button id="loadPersonalBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition">刷新</button>
-                    </div>
-                    <div id="personalStatus" class="tiny text-gray-400 mt-2"></div>
+                    <!-- Right: Main Chat Area -->
+                    <section class="lg:col-span-8 xl:col-span-9">
+                        <div class="glass-panel p-6 h-full flex flex-col">
+                            <!-- Chat Messages -->
+                            <div id="chat-box" class="chat-container flex-1 overflow-y-auto mb-4 space-y-4 pr-2">
+                                <div class="ai-msg p-5 rounded-2xl">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <div class="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center">
+                                            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"/>
+                                            </svg>
+                                        </div>
+                                        <span class="text-xs text-slate-500">Mercurial</span>
+                                    </div>
+                                    <div class="text-slate-200 leading-relaxed">
+                                        欢迎使用 <span class="gradient-text font-semibold">Mercurial</span> 智能助手。
+                                        <br><br>
+                                        上传 PDF/DOCX 文档并启用 RAG 模式，我将基于知识库内容提供带引用的精准回答。当资料不足时，我会清晰标注推理边界并提供下一步建议。
+                                    </div>
+                                    <div class="tiny text-slate-500 mt-3 pt-3 border-t border-slate-700/30">
+                                        提示：这是 Demo 环境，未实现用户隔离，适合本机单人使用。
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Mode Selection & Controls -->
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <button id="btn-chat" onclick="setMode('chat')" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all flex items-center gap-2 btn-active">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                    普通对话
+                                </button>
+                                <button id="btn-c" onclick="setMode('c')" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                                    C 语言
+                                </button>
+                                <button id="btn-python" onclick="setMode('python')" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                                    Python
+                                </button>
+                                <button id="btn-java" onclick="setMode('java')" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                                    Java
+                                </button>
+
+                                <div class="flex-1"></div>
+
+                                <button onclick="clearHistory()" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-amber-400 hover:border-amber-500/30 transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    清空
+                                </button>
+                                <button onclick="quitApp()" class="glow-btn glass-panel-sm px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                    退出
+                                </button>
+                            </div>
+
+                            <!-- Input Area -->
+                            <div class="relative">
+                                <input type="text" id="user-input"
+                                    class="input-glow form-input w-full px-5 py-4 pr-28 text-slate-100 placeholder-slate-500 text-base"
+                                    placeholder="输入你的问题..."
+                                    onkeyup="if(event.key==='Enter') sendMessage()">
+                                <button id="send-btn" onclick="sendMessage()"
+                                    class="glow-btn absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-sky-500 to-violet-500 hover:from-sky-400 hover:to-violet-400 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
+                                    发送
+                                </button>
+                            </div>
+                            <div class="tiny text-slate-500 mt-3 text-center">
+                                RAG 模式下将先检索知识库片段，再生成带引用的回答
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
-
-            <!-- Right: Chat -->
-            <div class="lg:col-span-2">
-                <div id="chat-box" class="chat-container overflow-y-auto mb-4 space-y-4 pr-2">
-                    <div class="ai-msg p-4 rounded-lg">
-                        你好！上传你的 PDF/DOCX 并开启 RAG，我就可以“带引用”地回答啦～
-                        <div class="tiny text-gray-400 mt-2">提示：这是 demo，没有做用户隔离；本机单人使用没问题。</div>
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap gap-2 mb-3">
-                    <button id="btn-chat" onclick="setMode('chat')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center btn-active">
-                        <span class="mr-1">💬</span> 普通对话
-                    </button>
-                    <button id="btn-c" onclick="setMode('c')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                        <span class="mr-1">📁</span> C 语言模式
-                    </button>
-                    <button id="btn-python" onclick="setMode('python')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                        <span class="mr-1">🐍</span> Python 模式
-                    </button>
-                    <button id="btn-java" onclick="setMode('java')" class="bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                        <span class="mr-1">☕</span> Java 模式
-                    </button>
-                    <div class="border-l border-gray-800 mx-1"></div>
-                    <button onclick="clearHistory()" class="bg-gray-800 border border-gray-600 hover:bg-red-900/40 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                        <span class="mr-1">🧹</span> Clear
-                    </button>
-                    <button onclick="quitApp()" class="bg-gray-800 border border-gray-600 hover:bg-red-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition flex items-center">
-                        <span class="mr-1">❌</span> Quit
-                    </button>
-                </div>
-
-                <div class="relative">
-                    <input type="text" id="user-input"
-                        class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 pr-24 focus:outline-none focus:border-blue-500"
-                        placeholder="按当前模式输入需求..."
-                        onkeyup="if(event.key==='Enter') sendMessage()">
-                    <button id="send-btn" onclick="sendMessage()"
-                        class="absolute right-2 top-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg transition">发送</button>
-                </div>
-                <div class="tiny text-gray-500 mt-2">RAG 开启时：会先检索知识库片段，再交给模型回答，并在最后返回引用来源卡片。</div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script>
@@ -199,12 +525,18 @@
 
         function createMessageElement(role) {
             const div = document.createElement('div');
-            div.className = `p-4 rounded-lg ${role === 'user' ? 'user-msg ml-12' : 'ai-msg mr-12'}`;
+            div.className = `p-5 rounded-2xl ${role === 'user' ? 'user-msg ml-12' : 'ai-msg mr-4'}`;
             div.innerHTML = `
-                <div class="text-xs text-gray-500 mb-1">${role === 'user' ? '你' : '猫娘助手'}</div>
-                <div class="markdown-body text-gray-200"></div>
-                <div class="file-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-400 hidden"></div>
-                <div class="cite-info mt-3 pt-2 border-t border-gray-700 text-sm text-gray-300 hidden"></div>
+                <div class="flex items-center gap-2 mb-2">
+                    ${role === 'user' 
+                        ? '<div class="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center"><svg class="w-3 h-3 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg></div>'
+                        : '<div class="w-6 h-6 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center"><svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"/></svg></div>'
+                    }
+                    <span class="text-xs text-slate-500">${role === 'user' ? '你' : 'Mercurial'}</span>
+                </div>
+                <div class="markdown-body text-slate-200 leading-relaxed"></div>
+                <div class="file-info mt-4 pt-3 border-t border-slate-700/30 text-sm text-slate-400 hidden"></div>
+                <div class="cite-info mt-4 pt-3 border-t border-slate-700/30 text-sm text-slate-300 hidden"></div>
             `;
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -218,26 +550,28 @@
 
             const docs = j.documents || [];
             if (docs.length === 0) {
-                docList.innerHTML = '<div class="tiny text-gray-500">还没有上传任何文件</div>';
+                docList.innerHTML = '<div class="tiny text-slate-600">暂无上传文件</div>';
                 return;
             }
             docList.innerHTML = docs.map(d => `
-                <div class="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                <div class="glass-panel-sm px-3 py-2 flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                        <div class="text-sm text-gray-200 truncate">${escapeHtml(d.filename)}</div>
-                        <div class="tiny text-gray-500">#${d.id} · ${escapeHtml(d.created_at)}</div>
+                        <div class="text-sm text-slate-200 truncate">${escapeHtml(d.filename)}</div>
+                        <div class="tiny text-slate-500">#${d.id} · ${escapeHtml(d.created_at)}</div>
                     </div>
                     <button
-                        class="shrink-0 bg-red-700/70 hover:bg-red-600 text-white tiny px-2 py-1 rounded"
+                        class="shrink-0 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-red-200 tiny px-2 py-1 rounded-lg transition-colors"
                         onclick="deleteDoc(${d.id}, '${escapeHtml(d.filename)}')"
-                        title="删除这个文件（会重建索引）"
-                    >🗑 删除</button>
+                        title="删除文件"
+                    >
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
                 </div>
             `).join('');
         }
 
         async function deleteDoc(id, filename) {
-            if (!confirm(`确认删除：${filename} ？\n（删除后会重建向量索引，demo 中这是正常操作）`)) return;
+            if (!confirm(`确认删除：${filename} ？\n（删除后会重建向量索引）`)) return;
 
             uploadStatus.textContent = `正在删除 #${id}...`;
             try {
@@ -258,9 +592,7 @@
             }[m]));
         }
 
-        // -----------------------------
-        // ✅ LaTeX 预处理：跳过代码块 + 修复不成对的单 $
-        // -----------------------------
+        // LaTeX preprocessing
         function splitByFencedCode(text) {
             const parts = [];
             const re = /```[\s\S]*?```/g;
@@ -278,58 +610,37 @@
             if (!text) return '';
             return splitByFencedCode(text).map(p => {
                 if (p.type === 'code') return p.value;
-
                 let t = p.value;
-
-                // \[ \] -> $$ $$
                 t = t.replace(/\\\[\s*/g, '\n$$\n');
                 t = t.replace(/\s*\\\]/g, '\n$$\n');
-
-                // \( \) -> $ $
                 t = t.replace(/\\\(\s*/g, '$');
                 t = t.replace(/\s*\\\)/g, '$');
-
                 return t;
             }).join('');
         }
 
-        // ✅ 关键修复：如果出现奇数个单 $（排除 $$），就把最后一个单 $ 变成 \$，避免 KaTeX 整段失效
         function fixUnbalancedInlineDollars(text) {
             if (!text) return '';
-
             return splitByFencedCode(text).map(p => {
                 if (p.type === 'code') return p.value;
-
                 let t = p.value;
-
-                // 暂存 $$，避免干扰单 $ 计数
                 const DDL = "__DDL__";
                 t = t.replace(/\$\$/g, DDL);
-
-                // 找“单 $”：不支持转义 \$
                 const positions = [];
                 for (let i = 0; i < t.length; i++) {
                     if (t[i] === '$' && t[i - 1] !== '\\') positions.push(i);
                 }
-
                 if (positions.length % 2 === 1) {
                     const last = positions[positions.length - 1];
                     t = t.slice(0, last) + '\\$' + t.slice(last + 1);
                 }
-
-                // 还原 $$
                 t = t.replace(new RegExp(DDL, 'g'), '$$');
                 return t;
             }).join('');
         }
 
-        // -----------------------------
-        // ✅ KaTeX 渲染：更稳的等待 + 更长重试 + 下一帧执行
-        // -----------------------------
         function renderMathSafe(rootEl, retries = 40, delayMs = 120) {
             if (!rootEl) return;
-
-            // 放到下一帧：确保 marked 渲染后的 DOM 已经落地
             requestAnimationFrame(() => {
                 if (!window.renderMathInElement) {
                     if (retries <= 0) return;
@@ -361,32 +672,23 @@
         function renderMarkdownInto(el, rawText, { finalizeMath = false } = {}) {
             let normalized = normalizeLatexDelimitersOutsideCode(rawText);
             normalized = fixUnbalancedInlineDollars(normalized);
-
             el.innerHTML = marked.parse(normalized);
             highlightCode(el);
-
             if (finalizeMath) {
                 renderMathSafe(el);
             }
         }
 
-        // -----------------------------
-        // ✅ SSE 解析：支持 \n\n 与 \r\n\r\n；并提供 flush 机制
-        // -----------------------------
+        // SSE parsing
         function parseSSEEvents(buffer) {
             const events = [];
-
-            // 兼容 \n\n 和 \r\n\r\n
             const sepRe = /\r?\n\r?\n/;
-
             while (true) {
                 const match = sepRe.exec(buffer);
                 if (!match) break;
-
                 const idx = match.index;
                 const rawEvent = buffer.slice(0, idx);
                 buffer = buffer.slice(idx + match[0].length);
-
                 const lines = rawEvent.split(/\r?\n/);
                 const dataLines = lines.filter(l => l.startsWith('data:'));
                 if (dataLines.length) {
@@ -394,23 +696,18 @@
                     events.push(dataStr);
                 }
             }
-
             return { events, buffer };
         }
 
-        // ✅ flush：流结束时把残留 buffer 当成一个 event 再解析一次（防止 done 丢失）
         function flushSSEBuffer(buffer) {
             const trimmed = (buffer || '').trim();
             if (!trimmed) return [];
-
             const lines = trimmed.split(/\r?\n/);
             const dataLines = lines.filter(l => l.startsWith('data:'));
             if (!dataLines.length) return [];
-
             return [dataLines.map(l => l.replace(/^data:\s?/, '')).join('\n')];
         }
 
-        // 流式渲染节流（全局 single-flight；send 按钮禁用所以够用）
         let renderScheduled = false;
         function scheduleStreamRender(el, getText) {
             if (renderScheduled) return;
@@ -425,7 +722,7 @@
         uploadForm.onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(uploadForm);
-            uploadStatus.textContent = '上传 & 解析 & 建库中...';
+            uploadStatus.textContent = '上传 & 解析中...';
             try {
                 const r = await fetch('/upload', { method: 'POST', body: fd });
                 const j = await r.json();
@@ -468,7 +765,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memory: memoryBox.value })
             });
-            personalStatus.textContent = '已保存 ✅';
+            personalStatus.textContent = '已保存';
             setTimeout(() => personalStatus.textContent = '', 1500);
         }
 
@@ -492,7 +789,7 @@
 
             let fullText = "";
             let sseBuffer = "";
-            let gotDone = false; // ✅ 记录是否真的收到 done
+            let gotDone = false;
 
             fileInfoDiv.classList.add('hidden');
             citeInfoDiv.classList.add('hidden');
@@ -535,14 +832,12 @@
 
                     if (data.done) {
                         gotDone = true;
-
-                        // ✅ done：最终渲染（含数学）
                         renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
 
                         if (data.files && data.files.length > 0) {
                             fileInfoDiv.classList.remove('hidden');
                             const fileTags = data.files.map(f =>
-                                `<span class="bg-emerald-900 text-emerald-200 text-xs px-2 py-1 rounded mr-2">${escapeHtml(f)}</span>`
+                                `<span class="bg-emerald-500/20 text-emerald-300 text-xs px-2 py-1 rounded-lg mr-2">${escapeHtml(f)}</span>`
                             ).join('');
                             fileInfoDiv.innerHTML = `已保存文件: ${fileTags}`;
                         }
@@ -553,26 +848,26 @@
                         if (citations.length > 0) {
                             citeInfoDiv.classList.remove('hidden');
                             citeInfoDiv.innerHTML =
-                                '<div class="font-semibold mb-2">引用来源</div>' +
+                                '<div class="font-semibold mb-3 text-slate-200">引用来源</div>' +
                                 citations.map(c => `
-                                    <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 mb-2">
-                                        <div class="tiny text-blue-300 font-semibold">
+                                    <div class="glass-panel-sm p-3 mb-2">
+                                        <div class="tiny text-sky-400 font-semibold">
                                             ${escapeHtml(c.tag)} ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))}${c.score != null ? ` · score=${escapeHtml(String(c.score))}` : ''}
                                         </div>
-                                        <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                        <div class="tiny text-slate-300 mt-1">${escapeHtml(c.snippet)}</div>
                                     </div>
                                 `).join('');
                         } else if (retrieved.length > 0) {
                             citeInfoDiv.classList.remove('hidden');
                             citeInfoDiv.innerHTML =
-                                '<div class="font-semibold mb-2">检索到候选片段（未达到引用阈值）</div>' +
-                                `<div class="tiny text-gray-400 mb-2">说明：本次检索到的片段可能与问题不够贴合，所以没有作为“引用”插入回答，但你仍可参考。</div>` +
+                                '<div class="font-semibold mb-2 text-slate-200">检索到候选片段（未达到引用阈值）</div>' +
+                                `<div class="tiny text-slate-500 mb-2">本次检索到的片段可能与问题不够贴合，但仍可参考。</div>` +
                                 retrieved.map((c, idx) => `
-                                    <div class="bg-gray-800/40 border border-gray-700 rounded-lg p-3 mb-2">
-                                        <div class="tiny text-gray-300 font-semibold">
+                                    <div class="glass-panel-sm p-3 mb-2 opacity-70">
+                                        <div class="tiny text-slate-400 font-semibold">
                                             [cand${idx+1}] ${escapeHtml(c.filename)} @ ${escapeHtml(String(c.locator))} · score=${escapeHtml(String(c.score))}
                                         </div>
-                                        <div class="tiny text-gray-200 mt-1">${escapeHtml(c.snippet)}</div>
+                                        <div class="tiny text-slate-300 mt-1">${escapeHtml(c.snippet)}</div>
                                     </div>
                                 `).join('');
                         }
@@ -594,18 +889,16 @@
                     }
                 }
 
-                // ✅ 关键修复：流结束后 flush 一次残留 buffer（防止最后的 done 没有 \n\n）
                 const tailEvents = flushSSEBuffer(sseBuffer);
                 for (const evt of tailEvents) handleEvent(evt);
 
-                // ✅ 兜底：如果后端没发 done，至少也做一次 finalize（保证 KaTeX 不会“偶发永远不渲染”）
                 if (!gotDone) {
                     renderMarkdownInto(aiContentBody, fullText, { finalizeMath: true });
                 }
 
             } catch (e) {
                 console.error(e);
-                aiContentBody.innerHTML = `<div class="text-red-500">连接中断或后端报错</div>`;
+                aiContentBody.innerHTML = `<div class="text-red-400">连接中断或后端报错</div>`;
             } finally {
                 sendBtn.disabled = false;
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -613,15 +906,15 @@
         }
 
         async function clearHistory() {
-            if(!confirm("清空历史？")) return;
+            if(!confirm("清空对话历史？")) return;
             await fetch('/clear', { method: 'POST' });
-            chatBox.innerHTML = '<div class="ai-msg p-4 rounded-lg">对话历史已清空。已重置为普通对话。</div>';
+            chatBox.innerHTML = '<div class="ai-msg p-5 rounded-2xl"><div class="text-slate-200">对话历史已清空，已重置为普通对话模式。</div></div>';
             setMode('chat');
         }
 
         async function quitApp() {
-            if(!confirm("退出应用？")) return;
-            document.getElementById('status-tag').innerHTML = '<span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span> 服务已关闭';
+            if(!confirm("确认退出应用？")) return;
+            document.getElementById('status-tag').innerHTML = '<span class="status-dot bg-red-500 text-red-500"></span><span class="text-red-400 text-xs font-medium ml-2">已离线</span>';
             fetch('/quit', { method: 'POST' });
             const div = createMessageElement('ai');
             div.querySelector('.markdown-body').innerText = "后端进程已终止，请手动关闭窗口。";

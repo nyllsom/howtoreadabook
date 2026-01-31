@@ -33,10 +33,6 @@ embedder = LocalEmbedder()
 DIM = embedder.dim
 index = load_or_create_index(DIM)
 
-# ====== Chat state ======
-SYSTEM_PROMPT = {"role": "system", "content": "你是一个专业的网络安全猫娘。"}
-conversation_history = [SYSTEM_PROMPT]
-
 # -----------------------------
 # RAG config
 # -----------------------------
@@ -52,6 +48,51 @@ STRICT_TRIGGER_PATTERNS = [
 def is_strict_query(user_text: str) -> bool:
     t = (user_text or "").lower()
     return any(p.lower() in t for p in STRICT_TRIGGER_PATTERNS)
+
+# -----------------------------
+# Identity / Persona
+# -----------------------------
+ASSISTANT_NAME = "Mercurial"
+ASSISTANT_NAME_ZH = "墨丘利"
+
+def build_system_prompt():
+    """
+    每次请求动态重建系统提示词：
+    - 注入用户偏好 + 记忆
+    - 强化 RAG 引用规则
+    - 固化 Mercurial 人设：优雅、古典、敏捷、智能的指引者
+    """
+    prefs = get_prefs()
+    profile = get_profile()
+
+    lines = [
+        f"你是 {ASSISTANT_NAME}（{ASSISTANT_NAME_ZH}）。",
+        "灵感源自 Mercury（水银）的流动金属特性，也象征罗马神话中传递信息、速度极快的使者神。",
+        "你的风格：优雅、古典、富有智能；表达清晰、克制但有温度；善于把复杂问题讲明白并给出可执行步骤。",
+        "你的职责：作为一个专业助手，擅长网络安全、软件工程、RAG/检索增强问答的最佳实践与调试。",
+        "",
+        f"输出语言偏好: {prefs.get('language', 'zh')}",
+        f"语气偏好: {prefs.get('tone', '优雅、专业、简洁')}",
+        f"格式偏好: {prefs.get('format_hint', '先结论后分点，最后给 next steps')}",
+        f"引用格式要求: {prefs.get('cite_style', '仅在确有引用时输出 [1][2]')}",
+        "",
+        "RAG 规则：",
+        "1) 若提供了【资料片段】（标签形如 [1][2]），你可以引用它们来支撑回答，并在对应句子后标注 [n]。",
+        "2) 若没有提供任何【资料片段】，严禁输出形如 [1] 的引用标签（避免假引用）。",
+        "3) 默认模式下：资料片段是“辅助证据”，不足时也要给出可用答案，并明确哪些是(推理/常识)。",
+        "4) 仅当用户明确要求“必须/仅根据资料”时，才严格限制在资料范围内，不足则直说资料不足。"
+    ]
+
+    memory = (profile.get("memory") or "").strip()
+    if memory:
+        lines.append("")
+        lines.append("用户长期信息/偏好补充（仅当相关时使用，避免无关提及）:")
+        lines.append(memory)
+
+    return {"role": "system", "content": "\n".join(lines)}
+
+# ====== Chat state ======
+conversation_history = [build_system_prompt()]
 
 # ====== Utility: save code blocks ======
 def save_code_blocks(text: str):
@@ -149,31 +190,6 @@ def build_rag_context(message: str, top_k: int = 6):
         })
 
     return ctx_lines_used, citations_used, retrieved
-
-def build_system_prompt():
-    prefs = get_prefs()
-    profile = get_profile()
-
-    lines = [
-        "你是一个专业的网络安全猫娘助手。",
-        f"输出语言偏好: {prefs.get('language', 'zh')}",
-        f"语气偏好: {prefs.get('tone', '')}",
-        f"格式偏好: {prefs.get('format_hint', '')}",
-        f"引用格式要求: {prefs.get('cite_style', '')}",
-        "",
-        "RAG 规则：",
-        "1) 若提供了【资料片段】（标签形如 [1][2]），你可以引用它们来支撑回答，并在对应句子后标注 [n]。",
-        "2) 若没有提供任何【资料片段】，严禁输出形如 [1] 的引用标签（避免假引用）。",
-        "3) 默认模式下：资料片段是“辅助证据”，不足时也要给出可用答案，并明确哪些是(推理/常识)。",
-        "4) 仅当用户明确要求“必须/仅根据资料”时，才严格限制在资料范围内，不足则直说资料不足。"
-    ]
-
-    memory = (profile.get("memory") or "").strip()
-    if memory:
-        lines.append("用户长期信息/偏好补充（仅当相关时使用，避免无关提及）:")
-        lines.append(memory)
-
-    return {"role": "system", "content": "\n".join(lines)}
 
 # ====== Delete docs support ======
 DB_PATH = "data/app.db"
@@ -413,7 +429,7 @@ def chat():
                 "done": True,
                 "files": files,
                 "citations": citations_used,
-                "retrieved": retrieved,   # ✅ 新增：候选片段（保证前端“总有卡片可展示”）
+                "retrieved": retrieved,   # ✅ 候选片段：保证前端“总有卡片可展示”
                 "rag": {
                     "enabled": bool(use_rag),
                     "strict": bool(rag_strict),
@@ -433,7 +449,8 @@ def chat():
 @app.route("/clear", methods=["POST"])
 def clear():
     global conversation_history
-    conversation_history = [SYSTEM_PROMPT]
+    # ✅ 清空后也用 Mercurial 的 system prompt（含偏好与记忆）
+    conversation_history = [build_system_prompt()]
     return jsonify({"status": "success", "message": "对话历史已清空"})
 
 @app.route("/quit", methods=["POST"])
